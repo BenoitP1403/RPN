@@ -1,0 +1,8 @@
+example.png:
+  type: bopti-image
+  name: img_example
+font.png:
+  name:font
+  type: font
+  charset: print
+  grid.size: 16x19
