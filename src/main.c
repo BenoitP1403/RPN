@@ -8,7 +8,6 @@ Benoît Poreaux
 #include <gint/keyboard.h>
 #include <gint/display.h>
 #include <gint/gint.h>
-#include <gint/clock.h>
 #include <gint/bfile.h>
 #include <math.h>
 
@@ -497,7 +496,6 @@ dispPile (double *pile, char lastDisplayed, char signeInput,
   buffer2 = NULL;
 }
 
-
 uint
 findKey (key_event_t event)
 {				// Returns the code for the key pressed.
@@ -528,9 +526,6 @@ findKey (key_event_t event)
   return o;
 
 }
-
-
-
 
 void
 resetBuffer (char *buffer)
