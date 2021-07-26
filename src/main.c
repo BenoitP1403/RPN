@@ -50,7 +50,7 @@ void rotateUp (double *pile, char t);
 void PushUp (double *pile);
 void resetP (double *pile);
 void addNumber (double i, double *pile);
-char PileSwitchRotations (double *pile, int op, unsigned char lastDisplayed);
+void PileSwitchRotations (double *pile, int op, unsigned char lastDisplayed);
 void double2buffer (double nb, char *buffer);
 char numberPressed (key_event_t o);
 void doOp (double nb1, double nb2, unsigned char op, double *pile,
@@ -207,28 +207,27 @@ addNumber (double i, double *pile)
   pile[1] = i;
 }
 
-char
-PileSwitchRotations (double *pile, int op, unsigned char lastDisplayed)
+void PileSwitchRotations (double *pile, int op, unsigned char lastDisplayed)
 {
   if (op == KEY_LEFTP)
     {
       rotateDown (pile, lastDisplayed);
-      return 1;
+      return;
     }
-  else if (op == KEY_RIGHTP)
+  if (op == KEY_RIGHTP)
     {
       rotateUp (pile, lastDisplayed);
-      return 1;
+      return;
     }
-  else if (op == KEY_FRAC && lastDisplayed > 2)
+  if (op == KEY_FRAC && lastDisplayed > 2)
     {
       double tmp;
       tmp = pile[1];
       pile[1] = pile[2];
       pile[2] = tmp;
-      return 1;
+      return;
     }
-  return 0;
+  return;
 }
 
 void
@@ -652,9 +651,10 @@ mainLoop ()
 	  gint_world_switch (GINT_CALL (writePileInFS, pile, &lastDisplayed));
 	  break;
 	}
-      if ((PileSwitchRotations (pile, op, lastDisplayed)))
+  if (op==KEY_FRAC || op==KEY_LEFTP || op==KEY_RIGHTP)
 	{
-	  continue;
+	  PileSwitchRotations (pile, op, lastDisplayed);
+    continue;
 	}
       if (op == KEY_PI)
 	{
