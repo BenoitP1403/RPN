@@ -59,7 +59,7 @@ void dispPile (double *pile, char lastDisplayed, char signeInput,
 	       char *bufferInput);
 uint findKey (key_event_t event);
 void resetBuffer (char *buffer);
-void writePileInFS (double *pile, unsigned char lastDisplayed);
+void writePileInFS (double *pile, unsigned char *lastDisplayed);
 void readPileInFS (double *pile, unsigned char *lastDisplayed);
 void mainLoop ();
 int main ();
@@ -489,8 +489,8 @@ dispPile (double *pile, char lastDisplayed, char signeInput,
 	      buffer[3] = '\0';
 	    }
 	  dtext (WIDTH / 40,
-		 HEIGHT - (int) ((HEIGHT / (taillePile)) * (i + 1)), C_BLACK,
-		 buffer);
+		 HEIGHT - (int) ((HEIGHT / (taillePile)) * (i + 1)),
+		 C_BLACK, buffer);
 	}
     }
   dupdate ();
@@ -543,12 +543,13 @@ resetBuffer (char *buffer)
 }
 
 void
-writePileInFS (double *pile, unsigned char lastDisplayed)
+writePileInFS (double *pile, unsigned char *lastDisplayed)
 {
+  //No need to check if the file exists, it was created when the add in was launched.
   static const uint16_t *path = u"\\\\fls0\\.RPN.sav";
   int fd = BFile_Open (path, BFile_WriteOnly);
   BFile_Write (fd, pile, sizeof (double) * taillePile);
-  BFile_Write (fd, &lastDisplayed, sizeof (char) + 1);
+  BFile_Write (fd, lastDisplayed, sizeof (char) + 1);
   BFile_Close (fd);
 }
 
@@ -579,6 +580,9 @@ void
 mainLoop ()
 {
   double *pile = malloc (taillePile * sizeof (double));
+  char *bufferInput = malloc (tailleBuffer * sizeof (char));
+  if (pile == NULL || bufferInput == NULL)
+    return;
   for (int i = 0; i < taillePile; i++)
     {
       pile[i] = 0;
@@ -587,30 +591,32 @@ mainLoop ()
   char NEntered = False;	// Has a number been entered since the last calculation or EXE?
   char signeInput = 1;		// Sign of the input. 1 for plus and -1 for minus.
   unsigned char itInput = 0;
-  char *bufferInput = malloc (tailleBuffer * sizeof (char));
   resetBuffer (bufferInput);
   unsigned char lastDisplayed = 1;
-  readPileInFS (pile, &lastDisplayed);
-  dispPile (pile, lastDisplayed, 1, bufferInput);	// It displays the numbers before the user press a key.
+  gint_world_switch (GINT_CALL (readPileInFS, pile, &lastDisplayed));
   while (1)
     {
+      dispPile (pile, lastDisplayed, signeInput, bufferInput);
       op = 0;
       key_event_t o;
-      o = getkey_opt (215, NULL);	// The event of the key pressed goes into o.
+      o = getkey_opt (0b11010111, NULL);	// The event of the key pressed goes into o. KEY_MENU does not call gint_os_menu
       if (numberPressed (o))
 	{
 	  bufferInput[itInput] = ev2nb (o) + '0';
 	  bufferInput[itInput + 1] = '\0';
 	  itInput++;
+	  continue;
 
 	}
-      else if (o.key == KEY_DOT)
+      op = findKey (o);		//op is the value of the operation
+      if (op == KEY_DOT)
 	{
 	  bufferInput[itInput] = '.';
 	  bufferInput[itInput + 1] = '\0';
 	  itInput++;
+	  continue;
 	}
-      else if (o.key == KEY_DEL)
+      if (op == KEY_DEL)
 	{
 	  if (itInput > 0)
 	    {
@@ -626,15 +632,13 @@ mainLoop ()
 	      pile[lastDisplayed] = 0;
 	      lastDisplayed--;
 	    }
+	  continue;
 	}
-      else if (o.key == KEY_NEG)
+      if (op == KEY_NEG)
 	{
 	  signeInput = -signeInput;
 	  op = 0;
-	}
-      else
-	{
-	  op = findKey (o);	//op is the value of the operation
+	  continue;
 	}
       pile[0] = str2double (bufferInput, itInput);
       pile[0] *= signeInput;
@@ -645,18 +649,20 @@ mainLoop ()
       if (op == KEY_EXIT || op == KEY_MENU)
 	{
 	  //gint_osmenu();
-	  writePileInFS (pile, lastDisplayed);
-    break;
+	  gint_world_switch (GINT_CALL (writePileInFS, pile, &lastDisplayed));
+	  break;
 	}
       if ((PileSwitchRotations (pile, op, lastDisplayed)))
 	{
+	  continue;
 	}
-      else if (op == KEY_PI)
+      if (op == KEY_PI)
 	{
 	  addNumber (3.14159265358979323846264338, pile);
 	  lastDisplayed++;
+	  continue;
 	}
-      else if ((op == KEY_ENTER) && (bufferInput[0] != '\0'))
+      if ((op == KEY_ENTER) && (bufferInput[0] != '\0'))
 	{
 	  addNumber (pile[0], pile);
 	  pile[0] = 0;
@@ -666,9 +672,9 @@ mainLoop ()
 	    lastDisplayed++;
 	  resetBuffer (bufferInput);
 	  itInput = 0;
+	  continue;
 	}
-      else if ((lastDisplayed >= 2) && op == KEY_ENTER
-	       && (bufferInput[0] == '\0'))
+      if ((lastDisplayed >= 2) && op == KEY_ENTER && (bufferInput[0] == '\0'))
 	{
 	  addNumber (pile[1], pile);
 	  pile[0] = 0;
@@ -678,16 +684,18 @@ mainLoop ()
 	    lastDisplayed++;
 	  resetBuffer (bufferInput);
 	  itInput = 0;
+	  continue;
 	}
-      else if (op == KEY_ACON)
+      if (op == KEY_ACON)
 	{
 	  resetP (pile);
 	  lastDisplayed = 1;
 	  resetBuffer (bufferInput);
 	  signeInput = 1;
 	  itInput = 0;
+	  continue;
 	}
-      else if ((lastDisplayed >= 2) && op != 0 && (bufferInput[0] == '\0'))
+      if ((lastDisplayed >= 2) && op != 0 && (bufferInput[0] == '\0'))
 	{
 	  doOp (pile[1], pile[2], op, pile, NEntered, &lastDisplayed);
 	  op = 0;
@@ -695,8 +703,9 @@ mainLoop ()
 	  signeInput = 1;
 	  resetBuffer (bufferInput);
 	  itInput = 0;
+	  continue;
 	}
-      else if ((lastDisplayed >= 1) && op != 0 && (bufferInput[0] != '\0'))
+      if ((lastDisplayed >= 1) && op != 0 && (bufferInput[0] != '\0'))
 	{
 	  doOp (pile[0], pile[1], op, pile, NEntered, &lastDisplayed);
 	  op = 0;
@@ -705,13 +714,13 @@ mainLoop ()
 	  signeInput = 1;
 	  resetBuffer (bufferInput);
 	  itInput = 0;
+	  continue;
 	}
-      dispPile (pile, lastDisplayed, signeInput, bufferInput);
 
     }
-  free(bufferInput);
+  free (bufferInput);
   free (pile);
- }
+}
 
 int
 main ()
